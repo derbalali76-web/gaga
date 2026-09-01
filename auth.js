@@ -496,6 +496,17 @@ const _SERIALS={
     'b47b612f7332e6041f20eac2ac57b3c2bb7d1bb341c10a56eca3ad4deeccc4b6':'محل 8',
     'f2b47d01f87d2d496397e167895e78b7c1846d919bc680de33b6b82f48c1dcc6':'محل 9',
     '329709f726a3213e9ea62a00ec376cc95a068e8002902fb5d682f7551863e6aa':'محل 10',
+    /* ═══ 10 سريالات جديدة (تعمل أوفلاين — القيمة '' كي تُعتمد بلا Firebase) ═══ */
+    '91b805351133af4477de797eb7721a6510177a98f298233a897f401c266b80ec':'',
+    '2eb1f733788e4261e3141c9f1be732caf7e6d7bf0e4212f6a26b99555993b3fa':'',
+    '831540bb1adf3b7924c7fb5073c4d029b8a0f7d7dbb73caec6b03b55b88d440f':'',
+    'b68139e3a0004eb0e1e040f7b875b5453ef0bad69b4a755f716d354a5cda6093':'',
+    '01e58869b7dfa6ce3b33a39554ee72fddb764819329de8b4af8ad8a7f75081c9':'',
+    'ffe397148779e76f9458365e45a5088807d7827c3920c3b512cdd1e46c6a7042':'',
+    '1abe0cb731faaffb1c5533e9c614fc76240d5066f7ccbbd1c5886c484b328eb4':'',
+    'c2a69147862f4f8b652ede00858c43889571fb127332fe7cab6823019321af86':'',
+    '63b010bf59f116c1d57a9e1fae2a1db625d811db1548430cdee1d6d7f30ed29c':'',
+    'be40bafc6bc3693911c9ea849b0d87ce3fa525d692694d45ffe94d362290dbd7':'',
 };
 /* 🌐 سريالات Firebase: goldpro/_serials/{sha256} = {site, name, active}
    لا يمكن سردها — تُقرأ بالهاش فقط (من يعرف السريال فقط يصل لعقدته). */
