@@ -43,7 +43,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
-    <link rel="stylesheet" href="./style.css?v=184">
+    <link rel="stylesheet" href="./style.css?v=185">
 </head>
 <body>
 <!-- ═══════════ ⛅ شاشة الطقس (تمويه) — 3 نقرات متتالية سريعة للدخول ═══════════ -->
@@ -733,12 +733,12 @@
 </div></div>
 
 <!-- 🔖 محرّر كود السلعة -->
-<div class="modal-overlay" id="codeEditModal"><div class="modal" style="max-width:600px">
+<div class="modal-overlay" id="codeEditModal" style="z-index:200"><div class="modal" style="max-width:600px">
     <div class="modal-handle"></div>
     <h3 id="codeEditTitle">كود جديد</h3>
     <input type="text" id="codeNameInp" placeholder="🔖 اسم/رمز الكود (مثال: طقم ١)"
         style="font-weight:900;font-size:1.05rem;text-align:center;border:2px solid var(--g500)">
-    <p style="font-size:.68rem;color:var(--t2);margin:.55rem 0 .2rem;text-align:right">السلع داخل الكود — الصنف · الوزن · العيار · الأجرة/غ:</p>
+    <p style="font-size:.68rem;color:var(--t2);margin:.55rem 0 .2rem;text-align:right">اختر أنواع السلعة داخل الكود — والأجرة/غ اختيارية (تُقترح عند البيع):</p>
     <div id="codeRows" style="display:flex;flex-direction:column;gap:.4rem;max-height:40vh;overflow-y:auto;padding:.1rem 0"></div>
     <div style="display:flex;gap:.5rem;margin-top:.7rem">
         <button class="bgy" onclick="closeModal('codeEditModal')" style="flex:1">إلغاء</button>
@@ -1031,13 +1031,13 @@
 
 
 <!-- ═══ ملفات JS ═══ -->
-<script src="./firebase.js?v=184"></script>
-<script src="./app.js?v=184"></script>
-<script src="./assistant.js?v=184"></script>
-<script src="./inventory.js?v=184"></script>
-<script src="./invoice.js?v=184"></script>
-<script src="./raffinage.js?v=184"></script>
-<script src="./auth.js?v=184"></script>
+<script src="./firebase.js?v=185"></script>
+<script src="./app.js?v=185"></script>
+<script src="./assistant.js?v=185"></script>
+<script src="./inventory.js?v=185"></script>
+<script src="./invoice.js?v=185"></script>
+<script src="./raffinage.js?v=185"></script>
+<script src="./auth.js?v=185"></script>
 
 
 <!-- ═══ شاشة السيريل نامبر ═══ -->

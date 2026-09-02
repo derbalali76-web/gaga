@@ -1486,7 +1486,7 @@ window.renderGoodsCodesList=()=>{
     const el=document.getElementById('goodsCodesList'); if(!el)return;
     if(!window._goodsCodes.length){ el.innerHTML='<div style="color:var(--t3);font-size:.72rem;text-align:center;padding:.4rem">لا توجد أكواد بعد</div>'; return; }
     el.innerHTML=window._goodsCodes.map((c,i)=>{
-        const sum=(c.items||[]).map(it=>`${it.n} ${fmt(it.w,2)}غ${it.k?'/'+fmt(it.k,0):''}`).join(' · ');
+        const sum=(c.items||[]).map(it=>`${it.n}${it.p?' ('+fmt(it.p,0)+' دج/غ)':''}`).join(' · ');
         return `<div class="saved-card" style="align-items:center">
             <div style="flex:1;min-width:0">
                 <strong style="color:var(--g500)">🔖 ${c.code}</strong>
@@ -1511,22 +1511,20 @@ window._addCodeRow=(vals)=>{
     const div=document.createElement('div'); div.className='cr-row';
     div.style.cssText='display:flex;gap:.35rem;align-items:center';
     div.innerHTML=`
-        <select class="cr-n" style="flex:1.4;margin:0;min-width:0">${_goodsOptions(vals&&vals.n?String(vals.n):'')}</select>
-        <input type="text" inputmode="decimal" class="cr-w" placeholder="الوزن" dir="ltr" style="flex:1;margin:0;min-width:0;text-align:center">
-        <input type="text" inputmode="decimal" class="cr-k" placeholder="العيار" dir="ltr" style="flex:.85;margin:0;min-width:0;text-align:center">
-        <input type="text" inputmode="decimal" class="cr-p" placeholder="الأجرة" dir="ltr" style="flex:1.1;margin:0;min-width:0;text-align:center">
+        <select class="cr-n" style="flex:1.6;margin:0;min-width:0">${_goodsOptions(vals&&vals.n?String(vals.n):'')}</select>
+        <input type="text" inputmode="decimal" class="cr-p" placeholder="💰 أجرة/غ (اختياري)" dir="ltr" style="flex:1;margin:0;min-width:0;text-align:center">
         <button type="button" class="cr-del" style="width:26px;height:34px;flex-shrink:0;border:none;border-radius:8px;background:rgba(220,38,38,.1);color:#dc2626;font-size:.9rem;cursor:pointer;padding:0">✕</button>`;
     div.querySelector('.cr-n').addEventListener('change',function(){ _handleGoodsSelect(this); _codeRowsChanged(); });
     div.querySelectorAll('input').forEach(inp=>inp.addEventListener('input',()=>{ liveNum(inp); _codeRowsChanged(); }));
     div.querySelector('.cr-del').addEventListener('click',()=>{ div.remove(); if(!box.children.length)_addCodeRow(); });
-    if(vals){ div.querySelector('.cr-w').value=vals.w||''; div.querySelector('.cr-k').value=vals.k||''; div.querySelector('.cr-p').value=vals.p||''; }
+    if(vals){ const pin=div.querySelector('.cr-p'); if(pin)pin.value=vals.p||''; }
     box.appendChild(div);
 };
 function _codeRowsChanged(){
     const box=document.getElementById('codeRows'); if(!box)return;
     const last=box.lastElementChild;
     const val=(r,c)=>{const e=r&&r.querySelector(c);return e?e.value.trim():'';};
-    if(last&&(val(last,'.cr-n')||val(last,'.cr-w')||val(last,'.cr-k')||val(last,'.cr-p')))_addCodeRow();
+    if(last&&(val(last,'.cr-n')||val(last,'.cr-p')))_addCodeRow();
 }
 window.openCodeEditor=(idx)=>{
     window._codeEditIdx=(idx==null?-1:idx);
@@ -1548,12 +1546,10 @@ window.saveGoodsCode=()=>{
     const items=[];
     document.querySelectorAll('#codeRows .cr-row').forEach(row=>{
         const g=(c)=>{const e=row.querySelector(c);return e?e.value.trim():'';};
-        const n=g('.cr-n'), w=parseFloat(g('.cr-w').replace(/\s/g,'').replace(',','.'))||0,
-              k=parseFloat(g('.cr-k').replace(/\s/g,'').replace(',','.'))||0,
-              p=parseFloat(g('.cr-p').replace(/\s/g,'').replace(',','.'))||0;
-        if(n&&n!=='__new__'&&w>0&&k>0)items.push({n,w,k,p:p>0?p:0});
+        const n=g('.cr-n'), p=parseFloat(g('.cr-p').replace(/\s/g,'').replace(',','.'))||0;
+        if(n&&n!=='__new__')items.push({n,...(p>0?{p}:{})});
     });
-    if(!items.length)return toast('أضف سلعة واحدة على الأقل بوزن وعيار','error');
+    if(!items.length)return toast('اختر اسم سلعة واحدة على الأقل','error');
     const dupIdx=window._goodsCodes.findIndex(c=>c.code===code);
     if(dupIdx>=0&&dupIdx!==window._codeEditIdx)return toast('هذا الكود موجود مسبقاً','error');
     const rec={code,items};
@@ -1576,13 +1572,28 @@ window.applyGoodsCode=()=>{
     const c=window._goodsCodes[Number(i)]; if(!c){sel.value='';return;}
     document.getElementById('goodsRows').innerHTML='';
     {const _h=document.getElementById('goodsColHead');if(_h)_h.remove();}
-    (c.items||[]).forEach(it=>_addGoodsRow(it));
+    (c.items||[]).forEach(it=>_addGoodsRow({n:it.n,p:it.p||''}));
     _addGoodsRow();
     /* فعّل مُنتقي الدفعة للسطور متعددة الدفعات */
     document.querySelectorAll('#goodsRows .g-row').forEach(r=>{ try{_populateLotPicker(r);}catch(e){} });
     if(typeof _updGoodsTotal==='function')_updGoodsTotal();
     sel.value='';
     toast('✅ عُبّئت سلعة الكود «'+c.code+'» — راجع ثم احفظ');
+};
+/* 🔖 إنشاء كود مباشرة من مخزون السلعة (سلعة موجودة → كود + سعر اختياري يُقترح عند البيع) */
+window.addCodeFromStock=(name)=>{
+    if(!name)return;
+    const code=(prompt('🔖 رمز الكود للسلعة «'+name+'»:')||'').trim();
+    if(!code)return;
+    const priceStr=(prompt('💰 سعر الأجرة/غ (اختياري — اتركه فارغاً):')||'').trim();
+    const p=parseFloat(priceStr.replace(/\s/g,'').replace(',','.'))||0;
+    const dup=window._goodsCodes.findIndex(c=>c.code===code);
+    const rec={code,items:[{n:name,...(p>0?{p}:{})}]};
+    if(dup>=0){ if(!confirm('الكود «'+code+'» موجود — استبداله؟'))return; window._goodsCodes[dup]=rec; }
+    else window._goodsCodes.push(rec);
+    _persistGoodsCodes();
+    if(typeof renderGoodsCodesList==='function')renderGoodsCodesList();
+    toast('✅ كود «'+code+'» — يظهر كاقتراح عند البيع');
 };
 let _dollPaid=true; /* دائماً خالص في نظام السلعة */
 window.setDollPaid=(v)=>{ _dollPaid=true; }; /* مُحيَّدة — أزرار خالص/غير خالص أُزيلت */
@@ -2146,14 +2157,15 @@ window.renderGoodsStock=()=>{
                 <b style="color:var(--g600);white-space:nowrap">${fmt(l.w,2)} غ</b>
             </div>`).join('');
         return `
-        <div class="saved-card" style="cursor:pointer" onclick="var e=document.getElementById('${detailId}');if(e)e.style.display=(e.style.display==='none'?'block':'none')">
-            <div>
+        <div class="saved-card" style="cursor:pointer;display:flex;align-items:flex-start;gap:.5rem" onclick="var e=document.getElementById('${detailId}');if(e)e.style.display=(e.style.display==='none'?'block':'none')">
+            <div style="flex:1;min-width:0">
                 <strong>🛍️ ${G.n}</strong>
                 <span style="color:var(--g600);font-weight:900;margin-right:.3rem">⚖️ ${fmt(G.w,2)} غ</span>
                 ${G.k?`<span style="color:var(--pu);font-weight:800;margin-right:.3rem">🏷️ عيار ${fmt(G.k,0)}</span>`:''}
                 <small style="color:var(--t2);display:block;font-size:.62rem">${G.lots.length} دفعة${multi?' — اضغط للتفصيل 👆':' · '+(G.lots[0].src||'—')+' · أجرة '+fmt(G.lots[0].p||0,0)+' دج/غ'}</small>
                 <div id="${detailId}" style="display:none;margin-top:.4rem">${lotsHtml}</div>
             </div>
+            <button onclick="event.stopPropagation();addCodeFromStock('${(G.n||'').replace(/'/g,"\\'")}')" style="flex-shrink:0;border:none;border-radius:8px;background:rgba(212,175,55,.15);color:var(--g600);font-weight:900;font-size:.66rem;padding:.4rem .55rem;cursor:pointer;font-family:Tajawal,sans-serif">🔖 كود</button>
         </div>`;
     }).join('');
 };
