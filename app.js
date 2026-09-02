@@ -638,6 +638,35 @@ window._readLiqGoods=()=>{
     });
     return items;
 };
+/* ── 🧱 سبائك الأرصدة الافتتاحية (وزن + عيار) — تدخل مخزون الذهب ── */
+window._addLiqBarRow=(vals)=>{
+    const box=document.getElementById('liqBarsRows');
+    if(!box||box.children.length>=30)return;
+    const div=document.createElement('div');
+    div.className='lb-row';
+    div.style.cssText='display:flex;gap:.35rem';
+    div.innerHTML=`
+        <input type="text" inputmode="decimal" class="lb-w" placeholder="⚖️ الوزن" dir="ltr" style="flex:1;margin:0;min-width:0;text-align:right">
+        <input type="text" inputmode="decimal" class="lb-k" placeholder="🏷️ العيار" dir="ltr" style="flex:1;margin:0;min-width:0;text-align:right">`;
+    div.querySelectorAll('input').forEach(inp=>inp.addEventListener('input',()=>{liveNum(inp);_liqBarsChanged();}));
+    if(vals){div.querySelector('.lb-w').value=vals.w||'';div.querySelector('.lb-k').value=vals.k||'';}
+    box.appendChild(div);
+};
+function _liqBarsChanged(){
+    const box=document.getElementById('liqBarsRows'); if(!box)return;
+    const last=box.lastElementChild;
+    const gv=(r,c)=>{const el=r.querySelector(c);return el?el.value.trim():'';};
+    if(last&&(gv(last,'.lb-w')||gv(last,'.lb-k')))window._addLiqBarRow();
+}
+window._readLiqBars=()=>{
+    const bars=[];
+    document.querySelectorAll('#liqBarsRows .lb-row').forEach(row=>{
+        const gn=c=>{const el=row.querySelector(c);return el?(parseFloat(el.value.replace(/\s/g,'').replace(/,/g,'.'))||0):0;};
+        const w=gn('.lb-w'),k=gn('.lb-k');
+        if(w>0&&k>0)bars.push({w,k});
+    });
+    return bars;
+};
 let _liqDebtCnt=0;
 let _liq730Cnt=0;
 window._add730BarRow=(w,k)=>{
@@ -676,6 +705,11 @@ window.openLiqEdit=()=>{
     const _goodsSec=document.getElementById('liqGoodsSection');
     if(_goodsSec)_goodsSec.style.display=_isEmp?'none':'';
     if(!_isEmp)window._addLiqGoodsRow();
+    /* 🧱 أسطر السبائك (للأدمين فقط، مثل السلعة) */
+    const lb=document.getElementById('liqBarsRows'); if(lb)lb.innerHTML='';
+    const _barsSec=document.getElementById('liqBarsSection');
+    if(_barsSec)_barsSec.style.display=_isEmp?'none':'';
+    if(!_isEmp)window._addLiqBarRow();
     /* تصفير جدول الديون وإضافة صف أول */
     _liqDebtCnt=0;
     const tbody=document.getElementById('liqDebtRows');
@@ -731,7 +765,8 @@ window.confirmLiqEdit=()=>{
     /* 🛍️ سلعة الكوفر بالتفصيل (اسم + ميزان + عيار) — تدخل المخزون */
     const goodsItems=_readLiqGoods();
     const dollar = Math.round(goodsItems.reduce((s,it)=>s+it.eq,0)*1000)/1000; /* مكافئ 705 إجمالي */
-    const bars730=[],g730raw=0,g730v=0;
+    const barsInput=_readLiqBars();
+    const g730v=0;
 
     /* ديون الزبائن: دينار ± وسلعة (705) ± موقّعة مباشرة + النوع (ورشة/سوق) */
     const debtRows=[];
@@ -756,6 +791,10 @@ window.confirmLiqEdit=()=>{
         goodsItems.forEach(it=>sumLines.push(`  • ${it.n}: ${fmt(it.w,2)} غ عيار ${fmt(it.k,0)}${it.p?' · أجرة '+fmt(it.p,0)+' دج/غ':''} → ${fmt(it.eq,2)} غ (705)`));
         sumLines.push(`  = المجموع بالمكافئ: ${fmt(dollar,2)} غ (705)`);
     }
+    if(barsInput.length){
+        sumLines.push('');sumLines.push(`🧱 السبائك (${barsInput.length}):`);
+        barsInput.forEach(b=>sumLines.push(`  • ${fmt(b.w,2)} غ عيار ${fmt(b.k,0)} → ${fmt(b.w*b.k/705,2)} غ (705)`));
+    }
     if(debtRows.length){
         sumLines.push('');sumLines.push('ديون الزبائن:');
         debtRows.forEach(r=>sumLines.push(
@@ -769,16 +808,17 @@ window.confirmLiqEdit=()=>{
     const nowStr=new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
     const barsAdd=[];
     const dispBars={};
-    bars730.forEach(b=>{
+    barsInput.forEach(b=>{
         const bid=uid();
-        barsAdd.push({id:bid,pool:'730',w:b.w,k:b.k});
+        /* العيار ≥ 999 → مخزون 24 (نقي)، غير ذلك → مخزون 730 */
+        barsAdd.push({id:bid,pool:(b.k>=999?'24':'730'),w:b.w,k:b.k});
         dispBars[bid]={desc:'رصيد افتتاحي',dt,src:'افتتاحي'};
     });
     emitEvent('OPENING',
         {dinar,dollar,g730v,debtRows,barsAdd,goodsItems,goldPrice},
         {
             bars:Object.keys(dispBars).length?dispBars:undefined,
-            op:{c:'النظام',t:'رصيد افتتاحي',m:'متعدد',a:dinar||dollar||g730v,
+            op:{c:'النظام',t:'رصيد افتتاحي',m:'متعدد',a:dinar||dollar||g730v||Math.round(barsInput.reduce((s,b)=>s+b.w*b.k/705,0)*1000)/1000,
                 _ts:Date.now(),dt:nowStr}
         }
     );
