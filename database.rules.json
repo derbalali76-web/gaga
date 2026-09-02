@@ -1,0 +1,48 @@
+{
+  "rules": {
+    "goldpro": {
+      "_serials": {
+        "$hash": {
+          ".read": true,
+          "owner": {
+            ".write": "auth != null && !data.exists() && newData.isString() && newData.val() + '@goldpro.local' === auth.token.email"
+          }
+        }
+      },
+      "_users": {
+        ".read": true
+      },
+      "_appcfg": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      },
+      "$user": {
+        "data": {
+          ".read": "auth != null",
+          ".write": "auth != null",
+          "events": {
+            ".indexOn": [
+              "ts"
+            ]
+          }
+        },
+        "cfg": {
+          ".read": "auth != null",
+          ".write": "auth != null"
+        },
+        "_users": {
+          ".read": "auth != null",
+          ".write": "auth != null && auth.token.email === $user + '@goldpro.local'"
+        }
+      },
+      "portal": {
+        "$phone": {
+          "$pin": {
+            ".read": true,
+            ".write": "auth != null"
+          }
+        }
+      }
+    }
+  }
+}

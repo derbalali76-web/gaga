@@ -1,4 +1,4 @@
-/* sw.js — Network-First مع Cache offline */
+/* sw.js — Network-First للملفات المحلية + Cache-First لمكتبات CDN → عمل أوفلاين كامل */
 /* عزل الكاش لكل تطبيق على نفس النطاق (كان يحذف كاش التطبيقات الأخرى) */
 const NS = (() => { try {
   let seg = self.location.pathname.replace(/\/[^/]*$/,'').split('/').filter(Boolean).pop() || 'root';
@@ -9,7 +9,9 @@ const NS = (() => { try {
   return (safe || 'root') + '#' + (h>>>0).toString(36);
 } catch(e){ return 'root'; } })();
 const CACHE_PREFIX = 'goldpro@' + NS + '-';
-const CACHE = CACHE_PREFIX + 'v177';
+const CACHE = CACHE_PREFIX + 'v184';
+
+/* ملفات التطبيق المحلية (تُخزَّن عند التثبيت) */
 const ASSETS = [
   './',
   './index.html',
@@ -28,16 +30,36 @@ const ASSETS = [
   './icons/icon-180.png',
 ];
 
-/* تثبيت: حفظ الملفات الأساسية في الكاش */
+/* مكتبات CDN التي يعتمد عليها إقلاع التطبيق — تُخزَّن مسبقاً (best-effort) كي يعمل أوفلاين */
+const CRITICAL_CDN = [
+  'https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js',
+  'https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js',
+  'https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js',
+];
+
+/* مضيفات CDN تُخدَّم Cache-First (مكتبات + خطوط + أيقونات). لا تشمل واجهات Firebase الحية. */
+const CDN_HOSTS = new Set([
+  'www.gstatic.com',
+  'cdnjs.cloudflare.com',
+  'fonts.googleapis.com',
+  'fonts.gstatic.com',
+]);
+
+/* تثبيت: خزّن ملفات التطبيق (إلزامي) + مكتبات CDN الحرجة (اختياري لا يُفشل التثبيت) */
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE)
-      .then(c => c.addAll(ASSETS))
-      .then(() => self.skipWaiting())
+    caches.open(CACHE).then(c =>
+      c.addAll(ASSETS).then(() =>
+        Promise.all(CRITICAL_CDN.map(u =>
+          c.add(new Request(u, { mode: 'cors' })).catch(() => {})
+        ))
+      )
+    ).then(() => self.skipWaiting())
   );
 });
 
-/* تفعيل: حذف كاشات قديمة */
+/* تفعيل: حذف كاشات قديمة لهذا التطبيق فقط */
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
@@ -48,21 +70,37 @@ self.addEventListener('activate', e => {
   );
 });
 
-/* الطلبات: Network-First → إذا فشل الإنترنت يُقرأ من الكاش */
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const url = new URL(e.request.url);
-  /* فقط نفس النطاق (لا Firebase ولا CDN) */
-  if (url.origin !== self.location.origin) return;
-  e.respondWith(
-    fetch(e.request)
-      .then(res => {
-        if (res && res.ok) {
-          const copy = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, copy));
-        }
-        return res;
-      })
-      .catch(() => caches.open(CACHE).then(c => c.match(e.request)))
-  );
+
+  /* ① ملفات التطبيق (نفس النطاق): Network-First → عند فشل الإنترنت يُقرأ من الكاش */
+  if (url.origin === self.location.origin) {
+    e.respondWith(
+      fetch(e.request)
+        .then(res => {
+          if (res && res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); }
+          return res;
+        })
+        .catch(() => caches.open(CACHE).then(c => c.match(e.request)))
+    );
+    return;
+  }
+
+  /* ② مكتبات وخطوط CDN: Cache-First → تُخزَّن أول مرة أونلاين وتُخدَّم أوفلاين بعدها */
+  if (CDN_HOSTS.has(url.hostname)) {
+    e.respondWith(
+      caches.open(CACHE).then(c =>
+        c.match(e.request).then(hit =>
+          hit || fetch(e.request).then(res => {
+            if (res && (res.ok || res.type === 'opaque')) c.put(e.request, res.clone());
+            return res;
+          }).catch(() => hit)
+        )
+      )
+    );
+    return;
+  }
+
+  /* ③ باقي الطلبات (واجهات Firebase الحية للبيانات/المصادقة): تمريرها للشبكة دون تدخّل */
 });

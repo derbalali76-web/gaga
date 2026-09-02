@@ -592,7 +592,7 @@ function openSettings(){
     const ap=document.getElementById('adminPanel');
     if(ap)ap.style.display=isAdmin?'block':'none';
     if(isAdmin)renderUsersList();
-    if(!_isEmp){ renderGoodsNamesList(); renderPortalCustList(); }
+    if(!_isEmp){ renderGoodsNamesList(); renderPortalCustList(); if(typeof renderGoodsCodesList==="function")renderGoodsCodesList(); }
     document.getElementById('settingsModal').classList.add('active');
     if(!_isEmp)setTimeout(()=>{const e=document.getElementById('settingGoldPrice');if(e)e.focus();},320);
 }
@@ -616,7 +616,8 @@ window._addLiqGoodsRow=(vals)=>{
     div.innerHTML=`
         <select class="lg-n" style="flex:1.4;margin:0;min-width:0">${typeof _goodsOptions==='function'?_goodsOptions(vals&&vals.n?String(vals.n):''):'<option value="">السلعة…</option>'}</select>
         <input type="text" inputmode="decimal" class="lg-w" placeholder="⚖️ الميزان" dir="ltr" style="flex:1;margin:0;min-width:0;text-align:right">
-        <input type="text" inputmode="decimal" class="lg-k" placeholder="🏷️ العيار" dir="ltr" style="flex:.85;margin:0;min-width:0;text-align:right">`;
+        <input type="text" inputmode="decimal" class="lg-k" placeholder="🏷️ العيار" dir="ltr" style="flex:.85;margin:0;min-width:0;text-align:right">
+        <input type="text" inputmode="decimal" class="lg-p" placeholder="💰 الأجرة/غ" dir="ltr" style="flex:1;margin:0;min-width:0;text-align:right">`;
     div.querySelector('select.lg-n').addEventListener('change',function(){_handleGoodsSelect(this);_liqGoodsChanged();});
     div.querySelectorAll('input').forEach(inp=>inp.addEventListener('input',()=>{liveNum(inp);_liqGoodsChanged();}));
     box.appendChild(div);
@@ -625,15 +626,15 @@ function _liqGoodsChanged(){
     const box=document.getElementById('liqGoodsRows'); if(!box)return;
     const last=box.lastElementChild;
     const gv=(r,c)=>{const el=r.querySelector(c);return el?el.value.trim():'';};
-    if(last&&(gv(last,'.lg-n')||gv(last,'.lg-w')||gv(last,'.lg-k')))window._addLiqGoodsRow();
+    if(last&&(gv(last,'.lg-n')||gv(last,'.lg-w')||gv(last,'.lg-k')||gv(last,'.lg-p')))window._addLiqGoodsRow();
 }
 window._readLiqGoods=()=>{
     const items=[];
     document.querySelectorAll('#liqGoodsRows .lg-row').forEach(row=>{
         const gv=c=>{const el=row.querySelector(c);return el?el.value.trim():'';};
         const gn=c=>{const el=row.querySelector(c);return el?(parseFloat(el.value.replace(/\s/g,'').replace(/,/g,'.'))||0):0;};
-        const n=gv('.lg-n'),w=gn('.lg-w'),k=gn('.lg-k');
-        if(n&&w>0&&k>0)items.push({n,w,k,eq:Math.round(w*k/705*1000)/1000});
+        const n=gv('.lg-n'),w=gn('.lg-w'),k=gn('.lg-k'),p=gn('.lg-p');
+        if(n&&w>0&&k>0)items.push({n,w,k,p:p>0?p:0,fv:Math.round(w*(p>0?p:0)),eq:Math.round(w*k/705*1000)/1000});
     });
     return items;
 };
@@ -752,7 +753,7 @@ window.confirmLiqEdit=()=>{
     if(dinar !==0&&!isNaN(dinar)&&dinar) sumLines.push(`💵 دينار: ${fmt(dinar,0)} دج`);
     if(goodsItems.length){
         sumLines.push(`🛍️ سلعة الكوفر (${goodsItems.length}):`);
-        goodsItems.forEach(it=>sumLines.push(`  • ${it.n}: ${fmt(it.w,2)} غ عيار ${fmt(it.k,0)} → ${fmt(it.eq,2)} غ (705)`));
+        goodsItems.forEach(it=>sumLines.push(`  • ${it.n}: ${fmt(it.w,2)} غ عيار ${fmt(it.k,0)}${it.p?' · أجرة '+fmt(it.p,0)+' دج/غ':''} → ${fmt(it.eq,2)} غ (705)`));
         sumLines.push(`  = المجموع بالمكافئ: ${fmt(dollar,2)} غ (705)`);
     }
     if(debtRows.length){
@@ -1472,6 +1473,117 @@ window._handleGoodsSelect=(el)=>{
 window._refreshGoodsSelects=()=>{
     document.querySelectorAll('#goodsRows select.g-n').forEach(el=>{ const v=el.value; el.innerHTML=_goodsOptions(v); });
 };
+
+/* ═══════════ 🔖 أكواد السلعة — تجميع أنواع سلعة تحت كود، والبيع بالكود يخصمها ═══════════ */
+window._goodsCodes=window._goodsCodes||[];
+(function(){ try{ const v=JSON.parse(localStorage.getItem('gp12_goodsCodes')||'[]'); if(Array.isArray(v))window._goodsCodes=v; }catch(e){} })();
+function _persistGoodsCodes(){
+    try{localStorage.setItem('gp12_goodsCodes',JSON.stringify(window._goodsCodes));}catch(e){}
+    if(window._saveGoodsCodesFb)try{window._saveGoodsCodesFb(window._goodsCodes);}catch(e){}
+}
+/* — قائمة الأكواد في الإعدادات — */
+window.renderGoodsCodesList=()=>{
+    const el=document.getElementById('goodsCodesList'); if(!el)return;
+    if(!window._goodsCodes.length){ el.innerHTML='<div style="color:var(--t3);font-size:.72rem;text-align:center;padding:.4rem">لا توجد أكواد بعد</div>'; return; }
+    el.innerHTML=window._goodsCodes.map((c,i)=>{
+        const sum=(c.items||[]).map(it=>`${it.n} ${fmt(it.w,2)}غ${it.k?'/'+fmt(it.k,0):''}`).join(' · ');
+        return `<div class="saved-card" style="align-items:center">
+            <div style="flex:1;min-width:0">
+                <strong style="color:var(--g500)">🔖 ${c.code}</strong>
+                <small style="display:block;color:var(--t2);font-size:.64rem">${sum||'—'}</small>
+            </div>
+            <div style="display:flex;gap:.3rem">
+                <button onclick="openCodeEditor(${i})" style="border:none;border-radius:8px;background:rgba(59,130,246,.12);color:#2563eb;font-weight:900;padding:.3rem .55rem;cursor:pointer;font-family:Tajawal,sans-serif">تعديل</button>
+                <button onclick="delGoodsCode(${i})" style="border:none;border-radius:8px;background:rgba(220,38,38,.1);color:#dc2626;font-weight:900;padding:.3rem .55rem;cursor:pointer;font-family:Tajawal,sans-serif">حذف</button>
+            </div>
+        </div>`;
+    }).join('');
+};
+window.delGoodsCode=(i)=>{
+    const c=window._goodsCodes[i]; if(!c)return;
+    if(!confirm('حذف الكود «'+c.code+'»؟'))return;
+    window._goodsCodes.splice(i,1); _persistGoodsCodes(); renderGoodsCodesList();
+};
+/* — محرّر الكود — */
+window._codeEditIdx=-1;
+window._addCodeRow=(vals)=>{
+    const box=document.getElementById('codeRows'); if(!box||box.children.length>=40)return;
+    const div=document.createElement('div'); div.className='cr-row';
+    div.style.cssText='display:flex;gap:.35rem;align-items:center';
+    div.innerHTML=`
+        <select class="cr-n" style="flex:1.4;margin:0;min-width:0">${_goodsOptions(vals&&vals.n?String(vals.n):'')}</select>
+        <input type="text" inputmode="decimal" class="cr-w" placeholder="الوزن" dir="ltr" style="flex:1;margin:0;min-width:0;text-align:center">
+        <input type="text" inputmode="decimal" class="cr-k" placeholder="العيار" dir="ltr" style="flex:.85;margin:0;min-width:0;text-align:center">
+        <input type="text" inputmode="decimal" class="cr-p" placeholder="الأجرة" dir="ltr" style="flex:1.1;margin:0;min-width:0;text-align:center">
+        <button type="button" class="cr-del" style="width:26px;height:34px;flex-shrink:0;border:none;border-radius:8px;background:rgba(220,38,38,.1);color:#dc2626;font-size:.9rem;cursor:pointer;padding:0">✕</button>`;
+    div.querySelector('.cr-n').addEventListener('change',function(){ _handleGoodsSelect(this); _codeRowsChanged(); });
+    div.querySelectorAll('input').forEach(inp=>inp.addEventListener('input',()=>{ liveNum(inp); _codeRowsChanged(); }));
+    div.querySelector('.cr-del').addEventListener('click',()=>{ div.remove(); if(!box.children.length)_addCodeRow(); });
+    if(vals){ div.querySelector('.cr-w').value=vals.w||''; div.querySelector('.cr-k').value=vals.k||''; div.querySelector('.cr-p').value=vals.p||''; }
+    box.appendChild(div);
+};
+function _codeRowsChanged(){
+    const box=document.getElementById('codeRows'); if(!box)return;
+    const last=box.lastElementChild;
+    const val=(r,c)=>{const e=r&&r.querySelector(c);return e?e.value.trim():'';};
+    if(last&&(val(last,'.cr-n')||val(last,'.cr-w')||val(last,'.cr-k')||val(last,'.cr-p')))_addCodeRow();
+}
+window.openCodeEditor=(idx)=>{
+    window._codeEditIdx=(idx==null?-1:idx);
+    const box=document.getElementById('codeRows'); if(box)box.innerHTML='';
+    const inp=document.getElementById('codeNameInp'); if(inp)inp.value='';
+    const ttl=document.getElementById('codeEditTitle');
+    if(idx!=null&&window._goodsCodes[idx]){
+        const c=window._goodsCodes[idx];
+        if(inp)inp.value=c.code||'';
+        (c.items||[]).forEach(it=>_addCodeRow(it));
+        if(ttl)ttl.textContent='تعديل الكود';
+    }else if(ttl)ttl.textContent='كود جديد';
+    _addCodeRow();
+    document.getElementById('codeEditModal').classList.add('active');
+};
+window.saveGoodsCode=()=>{
+    const code=(document.getElementById('codeNameInp').value||'').trim();
+    if(!code)return toast('أدخل اسم/رمز الكود','error');
+    const items=[];
+    document.querySelectorAll('#codeRows .cr-row').forEach(row=>{
+        const g=(c)=>{const e=row.querySelector(c);return e?e.value.trim():'';};
+        const n=g('.cr-n'), w=parseFloat(g('.cr-w').replace(/\s/g,'').replace(',','.'))||0,
+              k=parseFloat(g('.cr-k').replace(/\s/g,'').replace(',','.'))||0,
+              p=parseFloat(g('.cr-p').replace(/\s/g,'').replace(',','.'))||0;
+        if(n&&n!=='__new__'&&w>0&&k>0)items.push({n,w,k,p:p>0?p:0});
+    });
+    if(!items.length)return toast('أضف سلعة واحدة على الأقل بوزن وعيار','error');
+    const dupIdx=window._goodsCodes.findIndex(c=>c.code===code);
+    if(dupIdx>=0&&dupIdx!==window._codeEditIdx)return toast('هذا الكود موجود مسبقاً','error');
+    const rec={code,items};
+    if(window._codeEditIdx>=0)window._goodsCodes[window._codeEditIdx]=rec; else window._goodsCodes.push(rec);
+    _persistGoodsCodes(); renderGoodsCodesList();
+    closeModal('codeEditModal');
+    toast('✅ حُفظ الكود «'+code+'»');
+};
+/* — تعبئة قائمة الأكواد في نافذة البيع — */
+window._fillGoodsCodeSel=()=>{
+    const sel=document.getElementById('goodsCodeSel'); if(!sel)return;
+    sel.innerHTML='<option value="">🔖 بيع بكود… (اختياري)</option>'+
+        window._goodsCodes.map((c,i)=>`<option value="${i}">${c.code} (${(c.items||[]).length} سلعة)</option>`).join('');
+    sel.value='';
+};
+/* — تطبيق الكود: يملأ سطور السلعة ثم تُخصم عند الحفظ عبر المسار العادي — */
+window.applyGoodsCode=()=>{
+    const sel=document.getElementById('goodsCodeSel'); if(!sel)return;
+    const i=sel.value; if(i==='')return;
+    const c=window._goodsCodes[Number(i)]; if(!c){sel.value='';return;}
+    document.getElementById('goodsRows').innerHTML='';
+    {const _h=document.getElementById('goodsColHead');if(_h)_h.remove();}
+    (c.items||[]).forEach(it=>_addGoodsRow(it));
+    _addGoodsRow();
+    /* فعّل مُنتقي الدفعة للسطور متعددة الدفعات */
+    document.querySelectorAll('#goodsRows .g-row').forEach(r=>{ try{_populateLotPicker(r);}catch(e){} });
+    if(typeof _updGoodsTotal==='function')_updGoodsTotal();
+    sel.value='';
+    toast('✅ عُبّئت سلعة الكود «'+c.code+'» — راجع ثم احفظ');
+};
 let _dollPaid=true; /* دائماً خالص في نظام السلعة */
 window.setDollPaid=(v)=>{ _dollPaid=true; }; /* مُحيَّدة — أزرار خالص/غير خالص أُزيلت */
 function _updDollarEq(){} /* مُحيَّدة — لا سعر صرف في نظام السلعة */
@@ -1575,6 +1687,10 @@ window.openDollar=(t,prefillName)=>{
     const _lkTab=document.getElementById('tabLiveKassi');
     if(_lkTab)_lkTab.style.display=(t==='sell')?'flex':'none';
     const _lkW=document.getElementById('liveKassiW'); if(_lkW)_lkW.value='';
+    /* 🔖 مُنتقي أكواد السلعة: بيع فقط */
+    const _cw=document.getElementById('goodsCodeWrap');
+    if(_cw)_cw.style.display=(t==='sell')?'block':'none';
+    if(t==='sell'&&typeof _fillGoodsCodeSel==='function')_fillGoodsCodeSel();
     const _gn=document.getElementById('goodsNote'); if(_gn)_gn.value='';
     document.getElementById('goodsRows').innerHTML='';{const _h=document.getElementById('goodsColHead');if(_h)_h.remove();}
     _addGoodsRow();
@@ -1600,6 +1716,19 @@ window.openDollar=(t,prefillName)=>{
     setTimeout(()=>document.getElementById('goodsCustomer').focus(),350);
 };
 /* ── أسطر السلعة الديناميكية ── */
+/* 🎯 اختيار الدفعة عند البيع: يظهر إذا كان للسلعة أكثر من دفعة في المخزون (مصادر/أجور مختلفة).
+   لا يظهر عند الشراء، ولا يظهر في سجل الزبون. */
+function _isSellMode(){ const t=document.getElementById('dollarTitle'); return !!(t&&t.textContent.includes('بيع')); }
+function _populateLotPicker(row){
+    const sel=row&&row.querySelector('.g-lot'); if(!sel)return;
+    const name=_rowVal(row,'.g-n');
+    if(!_isSellMode()||!name){ sel.style.display='none'; sel.innerHTML=''; return; }
+    const lots=(goodsStock||[]).filter(g=>g&&g.n===name&&g.w>0.0005);
+    if(lots.length<2){ sel.style.display='none'; sel.innerHTML=''; return; }
+    sel.innerHTML='<option value="">📦 تلقائي — الأقدم أولاً</option>'+lots.map(l=>
+        `<option value="${l.id}" data-k="${l.k||''}">👤 ${l.src||'—'} · أجرة ${fmt(l.p||0,0)} · ${fmt(l.w,2)}غ${l.k?' · ع'+fmt(l.k,0):''}</option>`).join('');
+    sel.style.display='block';
+}
 function _addGoodsRow(vals){
     const box=document.getElementById('goodsRows');
     if(!box||box.children.length>=30)return;
@@ -1618,14 +1747,22 @@ function _addGoodsRow(vals){
     }
     const div=document.createElement('div');
     div.className='g-row';
-    div.style.cssText='display:flex;gap:.35rem;align-items:center';
+    div.style.cssText='display:flex;flex-direction:column;gap:.3rem';
     div.innerHTML=`
-        <select class="g-n" style="flex:1.4;margin:0;min-width:0">${_goodsOptions(vals&&vals.n?String(vals.n):'')}</select>
-        <input type="text" inputmode="decimal" class="g-w" placeholder="الوزن" dir="ltr" style="flex:1;margin:0;min-width:0;text-align:center">
-        <input type="text" inputmode="decimal" class="g-k" placeholder="العيار" dir="ltr" style="flex:.85;margin:0;min-width:0;text-align:center">
-        <input type="text" inputmode="decimal" class="g-p" placeholder="الأجرة" dir="ltr" style="flex:1.1;margin:0;min-width:0;text-align:center">
-        <button type="button" class="g-del" style="width:26px;height:34px;flex-shrink:0;border:none;border-radius:8px;background:rgba(220,38,38,.1);color:#dc2626;font-size:.9rem;cursor:pointer;padding:0" title="حذف السطر">✕</button>`;
-    div.querySelector('select.g-n').addEventListener('change',function(){_handleGoodsSelect(this);_gRowsChanged();});
+        <div style="display:flex;gap:.35rem;align-items:center">
+            <select class="g-n" style="flex:1.4;margin:0;min-width:0">${_goodsOptions(vals&&vals.n?String(vals.n):'')}</select>
+            <input type="text" inputmode="decimal" class="g-w" placeholder="الوزن" dir="ltr" style="flex:1;margin:0;min-width:0;text-align:center">
+            <input type="text" inputmode="decimal" class="g-k" placeholder="العيار" dir="ltr" style="flex:.85;margin:0;min-width:0;text-align:center">
+            <input type="text" inputmode="decimal" class="g-p" placeholder="الأجرة" dir="ltr" style="flex:1.1;margin:0;min-width:0;text-align:center">
+            <button type="button" class="g-del" style="width:26px;height:34px;flex-shrink:0;border:none;border-radius:8px;background:rgba(220,38,38,.1);color:#dc2626;font-size:.9rem;cursor:pointer;padding:0" title="حذف السطر">✕</button>
+        </div>
+        <select class="g-lot" style="display:none;width:100%;margin:0;font-size:.72rem;padding:.4rem;border-radius:8px;border:1.5px solid rgba(212,175,55,.5)"></select>`;
+    div.querySelector('select.g-n').addEventListener('change',function(){_handleGoodsSelect(this);_populateLotPicker(div);_gRowsChanged();});
+    div.querySelector('select.g-lot').addEventListener('change',function(){
+        const opt=this.options[this.selectedIndex]; const k=opt&&opt.getAttribute('data-k');
+        if(k){ const kin=div.querySelector('.g-k'); if(kin)kin.value=k; }
+        _gRowsChanged();
+    });
     div.querySelectorAll('input').forEach(inp=>{
         inp.addEventListener('input',()=>{ liveNum(inp);_gRowsChanged(); });
     });
@@ -1657,8 +1794,9 @@ function _readGoodsRows(loose){
     document.querySelectorAll('#goodsRows .g-row').forEach(row=>{
         rowIdx++;
         const n=_rowVal(row,'.g-n'), w=_rowNum(row,'.g-w'), k=_rowNum(row,'.g-k'), p=_rowNum(row,'.g-p');
+        const lotEl=row.querySelector('.g-lot'); const lot=(lotEl&&lotEl.style.display!=='none')?(lotEl.value||''):'';
         /* p = سعر الأجرة للغرام الواحد (دج/غ) · fv = الأجرة الكلية للسطر = الوزن × السعر */
-        if(w>0&&k>0&&(n||loose))items.push({n:n||'',_row:rowIdx,w,k,p:p>0?p:0,fv:Math.round(w*(p>0?p:0)),eq:Math.round(w*k/705*1000)/1000});
+        if(w>0&&k>0&&(n||loose))items.push({n:n||'',_row:rowIdx,w,k,p:p>0?p:0,fv:Math.round(w*(p>0?p:0)),eq:Math.round(w*k/705*1000)/1000,...(lot?{lot}:{})});
     });
     return items;
 }
@@ -1986,16 +2124,38 @@ window.renderGoodsStock=()=>{
     const cntEl=document.getElementById('goodsStockCount');
     const listEl=document.getElementById('goodsStockList');
     if(!cntEl||!listEl)return;
-    cntEl.textContent=goodsStock.length;
-    listEl.innerHTML=goodsStock.length?goodsStock.map(g=>`
-        <div class="saved-card">
+    /* 🧺 تجميع الدفعات حسب الاسم (والعيار): سطر واحد بالإجمالي، والضغط يفصّل الدفعات (المصدر + الأجرة) */
+    const groups={};
+    goodsStock.forEach(g=>{
+        if(!(g.w>0.0005))return;
+        const key=g.n+'|'+(Number(g.k)||0);
+        (groups[key]||(groups[key]={n:g.n,k:Number(g.k)||0,w:0,lots:[]}));
+        groups[key].w+=g.w||0;
+        groups[key].lots.push(g);
+    });
+    const keys=Object.keys(groups);
+    cntEl.textContent=keys.length;
+    if(!keys.length){ listEl.innerHTML='<div style="text-align:center;color:var(--t3);padding:1.2rem">لا توجد سلع في المخزون</div>'; return; }
+    listEl.innerHTML=keys.map((key,gi)=>{
+        const G=groups[key];
+        const multi=G.lots.length>1;
+        const detailId='gsd_'+gi;
+        const lotsHtml=G.lots.map(l=>`
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:.45rem .6rem;margin-top:.3rem;background:rgba(212,175,55,.06);border:1px solid rgba(212,175,55,.28);border-radius:9px">
+                <span style="font-size:.72rem"><b>👤 ${l.src||'—'}</b><br><small style="color:var(--t2)">أجرة ${fmt(l.p||0,0)} دج/غ${l.dt?' · '+l.dt:''}</small></span>
+                <b style="color:var(--g600);white-space:nowrap">${fmt(l.w,2)} غ</b>
+            </div>`).join('');
+        return `
+        <div class="saved-card" style="cursor:pointer" onclick="var e=document.getElementById('${detailId}');if(e)e.style.display=(e.style.display==='none'?'block':'none')">
             <div>
-                <strong>🛍️ ${g.n}</strong>
-                <span style="color:var(--g600);font-weight:900;margin-right:.3rem">⚖️ ${fmt(g.w,2)} غ</span>
-                ${g.k?`<span style="color:var(--pu);font-weight:800;margin-right:.3rem">🏷️ عيار ${fmt(g.k,0)}</span>`:''}
-                <small style="color:var(--t2);display:block;font-size:.62rem">المصدر: ${g.src||'—'} · الأجرة: ${fmt(g.p||0,0)} دج/غ${g.dt?' · '+g.dt:''}</small>
+                <strong>🛍️ ${G.n}</strong>
+                <span style="color:var(--g600);font-weight:900;margin-right:.3rem">⚖️ ${fmt(G.w,2)} غ</span>
+                ${G.k?`<span style="color:var(--pu);font-weight:800;margin-right:.3rem">🏷️ عيار ${fmt(G.k,0)}</span>`:''}
+                <small style="color:var(--t2);display:block;font-size:.62rem">${G.lots.length} دفعة${multi?' — اضغط للتفصيل 👆':' · '+(G.lots[0].src||'—')+' · أجرة '+fmt(G.lots[0].p||0,0)+' دج/غ'}</small>
+                <div id="${detailId}" style="display:none;margin-top:.4rem">${lotsHtml}</div>
             </div>
-        </div>`).join(''):'<div style="text-align:center;color:var(--t3);padding:1.2rem">لا توجد سلع في المخزون</div>';
+        </div>`;
+    }).join('');
 };
 
 /* ═══════════ تعديل الفواتير (دولار/دبي/رافيناج) — إبطال ثم فتح معبّأ، مع استرجاع عند الإلغاء ═══════════ */

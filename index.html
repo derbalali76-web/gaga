@@ -43,9 +43,66 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
-    <link rel="stylesheet" href="./style.css?v=177">
+    <link rel="stylesheet" href="./style.css?v=184">
 </head>
 <body>
+<!-- ═══════════ ⛅ شاشة الطقس (تمويه) — 3 نقرات متتالية سريعة للدخول ═══════════ -->
+<div id="wxGate" style="position:fixed;inset:0;z-index:2147483000;background:linear-gradient(180deg,#56b0f4 0%,#2f8fe0 45%,#1667ce 100%);color:#fff;display:flex;flex-direction:column;align-items:center;font-family:'Tajawal',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:manipulation;overflow:hidden">
+  <div style="width:100%;display:flex;flex-direction:column;align-items:center;padding-top:calc(env(safe-area-inset-top,0px) + 2.2rem)">
+    <div style="font-size:1.7rem;font-weight:800;letter-spacing:.5px">الجزائر</div>
+    <div id="wxDate" style="font-size:.95rem;opacity:.9;margin-top:.15rem">—</div>
+  </div>
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.1rem">
+    <svg width="130" height="130" viewBox="0 0 200 200" style="filter:drop-shadow(0 6px 14px rgba(0,0,0,.18))">
+      <circle cx="74" cy="74" r="52" fill="#ffe27a"/>
+      <circle cx="74" cy="74" r="52" fill="#ffd23f" opacity=".55"/>
+      <g fill="#ffffff">
+        <ellipse cx="112" cy="120" rx="46" ry="38"/>
+        <ellipse cx="66" cy="136" rx="34" ry="28"/>
+        <ellipse cx="150" cy="132" rx="34" ry="27"/>
+        <rect x="40" y="132" width="150" height="30" rx="15"/>
+      </g>
+    </svg>
+    <div id="wxTemp" style="font-size:5rem;font-weight:300;line-height:1;margin-top:.3rem">24°</div>
+    <div style="font-size:1.15rem;font-weight:600;opacity:.95">غائم جزئياً</div>
+    <div style="font-size:1rem;opacity:.9;margin-top:.2rem">أعلى 28°&nbsp;&nbsp;·&nbsp;&nbsp;أدنى 17°</div>
+    <div id="wxClock" style="font-size:1.05rem;opacity:.85;margin-top:1rem;font-variant-numeric:tabular-nums">--:--</div>
+  </div>
+  <div id="wxDays" style="width:100%;display:flex;justify-content:space-around;padding:1rem .5rem calc(env(safe-area-inset-bottom,0px) + 1.6rem);background:rgba(255,255,255,.10);backdrop-filter:blur(2px)"></div>
+</div>
+<script>
+/* ⛅ بوابة الطقس: 3 نقرات متتالية خلال ثانية واحدة → دخول التطبيق. تُعاد عند العودة للتطبيق بعد غياب. */
+(function(){try{
+  var gate=document.getElementById('wxGate'); if(!gate) return;
+  var taps=0,last=0,WIN=1000,NEED=3,hiddenAt=0,RELOCK_MS=10000;
+  function lock(){ taps=0; gate.style.display='flex'; gate.style.opacity='1'; }
+  function unlock(){ gate.style.transition='opacity .35s'; gate.style.opacity='0';
+    setTimeout(function(){ gate.style.display='none'; },360); }
+  function onTap(){ var now=Date.now(); if(now-last>WIN)taps=0; taps++; last=now; if(taps>=NEED)unlock(); }
+  if(window.PointerEvent){ gate.addEventListener('pointerdown',onTap); }
+  else { gate.addEventListener('touchstart',onTap); gate.addEventListener('mousedown',onTap); }
+  /* أعِد قفل الطقس إذا غاب التطبيق ثم عاد بعد أكثر من 10 ثوانٍ */
+  document.addEventListener('visibilitychange',function(){
+    if(document.hidden){ hiddenAt=Date.now(); }
+    else if(hiddenAt && Date.now()-hiddenAt>RELOCK_MS){ lock(); }
+  });
+  /* الساعة + التاريخ + أيام الأسبوع (حيّة لواقعية أكبر) */
+  var AR_DAYS=['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+  var AR_MON=['جانفي','فيفري','مارس','أفريل','ماي','جوان','جويلية','أوت','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  var ICONS=['☀️','⛅','🌤️','🌦️','☀️'], HI=[28,27,29,26,30];
+  function p2(n){return (n<10?'0':'')+n;}
+  function tick(){ var d=new Date();
+    var c=document.getElementById('wxClock'); if(c)c.textContent=p2(d.getHours())+':'+p2(d.getMinutes());
+    var dt=document.getElementById('wxDate'); if(dt)dt.textContent=AR_DAYS[d.getDay()]+'، '+d.getDate()+' '+AR_MON[d.getMonth()];
+  }
+  (function buildDays(){ var box=document.getElementById('wxDays'); if(!box)return; var d=new Date(),h='';
+    for(var i=0;i<5;i++){ var nd=new Date(d.getTime()+i*86400000); var nm=i===0?'اليوم':AR_DAYS[nd.getDay()];
+      h+='<div style="display:flex;flex-direction:column;align-items:center;gap:.25rem;font-size:.8rem"><span style="opacity:.9">'+nm+'</span><span style="font-size:1.15rem">'+ICONS[i]+'</span><span style="font-weight:700">'+HI[i]+'°</span></div>'; }
+    box.innerHTML=h;
+  })();
+  tick(); setInterval(tick,10000);
+}catch(e){}})();
+</script>
 <script>
 /* 🔒 عزل الموظف الفوري — يُنفَّذ قبل أي رسم، بلا انتظار JS أو إنترنت.
    يقرأ الدور من التخزين المحلي ويطبّقه على body مباشرةً فلا تظهر أي ومضة لبيانات الأدمين. */
@@ -612,6 +669,9 @@
         style="font-weight:900;font-size:1.05rem;text-align:center;border:2px solid var(--g500)">
     <input type="text" id="goodsNote" placeholder="📝 ملاحظة (اختياري)"
         style="font-size:.85rem;text-align:right;margin-top:.35rem;border:1.5px solid var(--border)">
+    <div id="goodsCodeWrap" style="display:none;margin-top:.35rem">
+        <select id="goodsCodeSel" onchange="applyGoodsCode()" style="width:100%;font-weight:800;border:1.5px solid var(--g500);border-radius:8px;padding:.45rem;font-family:Tajawal,sans-serif"></select>
+    </div>
     <!-- السلع: القسم الأساسي دائم الظهور -->
     <div id="goodsRows" style="display:flex;flex-direction:column;gap:.4rem;max-height:26vh;overflow-y:auto;padding:.1rem 0;margin-top:.4rem"></div>
 
@@ -669,6 +729,20 @@
     <div class="mactions">
         <button class="bgy" onclick="closeModal('dollarModal')">إلغاء</button>
         <button class="bg" onclick="saveDollar()">💾 حفظ</button>
+    </div>
+</div></div>
+
+<!-- 🔖 محرّر كود السلعة -->
+<div class="modal-overlay" id="codeEditModal"><div class="modal" style="max-width:600px">
+    <div class="modal-handle"></div>
+    <h3 id="codeEditTitle">كود جديد</h3>
+    <input type="text" id="codeNameInp" placeholder="🔖 اسم/رمز الكود (مثال: طقم ١)"
+        style="font-weight:900;font-size:1.05rem;text-align:center;border:2px solid var(--g500)">
+    <p style="font-size:.68rem;color:var(--t2);margin:.55rem 0 .2rem;text-align:right">السلع داخل الكود — الصنف · الوزن · العيار · الأجرة/غ:</p>
+    <div id="codeRows" style="display:flex;flex-direction:column;gap:.4rem;max-height:40vh;overflow-y:auto;padding:.1rem 0"></div>
+    <div style="display:flex;gap:.5rem;margin-top:.7rem">
+        <button class="bgy" onclick="closeModal('codeEditModal')" style="flex:1">إلغاء</button>
+        <button onclick="saveGoodsCode()" style="flex:1;border:none;border-radius:10px;background:var(--gr);color:#fff;font-weight:900;font-family:Tajawal,sans-serif;cursor:pointer;padding:.6rem">💾 حفظ الكود</button>
     </div>
 </div></div>
 
@@ -879,6 +953,11 @@
         <div id="goodsNamesList" style="display:flex;flex-wrap:wrap;gap:.35rem"></div>
     </div>
     <div style="border:1px solid var(--border);border-radius:10px;padding:.6rem;margin:.6rem 0">
+        <p style="font-size:.75rem;font-weight:900;color:var(--g500);margin:0 0 .45rem;text-align:right">🔖 أكواد السلعة (تجميع أنواع سلعة تحت كود — والبيع بالكود يخصمها)</p>
+        <button onclick="openCodeEditor()" style="width:100%;padding:.5rem;border:none;border-radius:8px;background:var(--gr);color:#fff;font-weight:900;font-family:Tajawal,sans-serif;cursor:pointer;margin-bottom:.5rem">＋ كود جديد</button>
+        <div id="goodsCodesList" style="display:flex;flex-direction:column;gap:.4rem"></div>
+    </div>
+    <div style="border:1px solid var(--border);border-radius:10px;padding:.6rem;margin:.6rem 0">
         <p style="font-size:.75rem;font-weight:900;color:var(--g500);margin:0 0 .45rem;text-align:right">📱 زبائن البوابة — يدخلون برقم الهاتف ويرون كشف حسابهم</p>
         <div style="display:flex;gap:.4rem;margin-bottom:.5rem;flex-wrap:wrap">
             <input type="text" id="portalCustName" placeholder="اسم الزبون (كما في الديون)" style="flex:1.3 1 40%;margin:0">
@@ -952,13 +1031,13 @@
 
 
 <!-- ═══ ملفات JS ═══ -->
-<script src="./firebase.js?v=177"></script>
-<script src="./app.js?v=177"></script>
-<script src="./assistant.js?v=177"></script>
-<script src="./inventory.js?v=177"></script>
-<script src="./invoice.js?v=177"></script>
-<script src="./raffinage.js?v=177"></script>
-<script src="./auth.js?v=177"></script>
+<script src="./firebase.js?v=184"></script>
+<script src="./app.js?v=184"></script>
+<script src="./assistant.js?v=184"></script>
+<script src="./inventory.js?v=184"></script>
+<script src="./invoice.js?v=184"></script>
+<script src="./raffinage.js?v=184"></script>
+<script src="./auth.js?v=184"></script>
 
 
 <!-- ═══ شاشة السيريل نامبر ═══ -->

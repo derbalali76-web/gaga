@@ -259,6 +259,18 @@ async function setupFirstUser(){
     });
     try{ await firebase.auth().currentUser?.getIdToken(true); }catch(_){}
 
+    /* 🛑 حارس الاتصال: إن كان رابط databaseURL خاطئاً أو RTDB غير منشأة،
+       فإن .set() لا يفشل بل يتجمّد للأبد. نتحقق من الاتصال أولاً بمهلة. */
+    const _dbConnected=await Promise.race([
+        new Promise(res=>{ try{
+            const r=firebase.database().ref('.info/connected');
+            const cb=r.on('value',s=>{ if(s.val()===true){ try{r.off('value',cb);}catch(_){} res(true); } });
+        }catch(_){ res(false); } }),
+        new Promise(res=>setTimeout(()=>res(false),8000))
+    ]);
+    if(!_dbConnected)
+        return toast('⚠️ تعذّر الاتصال بقاعدة البيانات — أنشئ Realtime Database في مشروعك وتأكد من صحة databaseURL','error');
+
     /* 🔐 مطالبة السريال: تُكتب مرة واحدة فقط (القاعدة تمنع تغييرها لاحقاً) */
     if(window._snHashCur&&!window._snOwner){
         try{

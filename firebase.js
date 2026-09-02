@@ -27,6 +27,7 @@ window._saveSharedVisionKey=(v)=>{ try{return _db.ref('goldpro/_appcfg/visionKey
 /* 🏪 متعدد المستأجرين: إعدادات كل مستخدم (أسماء السلع + زبائن البوابة) في مساحته الخاصة goldpro/{user}/cfg */
 window._cfgRef=null; /* يُضبط عند الدخول من auth.js */
 window._saveGoodsNamesFb=(arr)=>{ try{return window._cfgRef?window._cfgRef.child('goodsNames').set(Array.isArray(arr)?arr:[]):Promise.resolve();}catch(e){return Promise.reject(e);} };
+window._saveGoodsCodesFb=(arr)=>{ try{return window._cfgRef?window._cfgRef.child('goodsCodes').set(Array.isArray(arr)?arr:[]):Promise.resolve();}catch(e){return Promise.reject(e);} };
 /* ── بوابة الزبائن ── */
 window._savePortalCustFb=(obj)=>{ try{return window._cfgRef?window._cfgRef.child('custPhones').set(obj||{}):Promise.resolve();}catch(e){return Promise.reject(e);} };
 /* 🏪 المسار يتضمّن هوية المحل: portal/{هاتف}/{كلمة السر}/{المحل}
@@ -44,6 +45,14 @@ window._attachUserCfg=()=>{
                 try{localStorage.setItem('gp12_goodsNames',JSON.stringify(v));}catch(e){}
                 if(typeof renderGoodsNamesList==='function')try{renderGoodsNamesList();}catch(e){}
                 if(typeof _refreshGoodsSelects==='function')try{_refreshGoodsSelects();}catch(e){}
+            }
+        });
+        window._cfgRef.child('goodsCodes').on('value',sn=>{
+            const v=sn.val();
+            if(Array.isArray(v)){
+                window._goodsCodes=v;
+                try{localStorage.setItem('gp12_goodsCodes',JSON.stringify(v));}catch(e){}
+                if(typeof renderGoodsCodesList==='function')try{renderGoodsCodesList();}catch(e){}
             }
         });
         window._cfgRef.child('custPhones').on('value',sn=>{
@@ -355,7 +364,7 @@ function _applyEvt(st,evt){
                     _eq+=w*k/705;
                     st.goodsStock.unshift({
                         id:(evt.id||'')+'_og'+i,
-                        n:it.n||'؟', w, k, p:0,
+                        n:it.n||'؟', w, k, p:Number(it.p)||0,
                         src:'افتتاحي', dt:'', ts:evt.ts||0
                     });
                 });
@@ -424,8 +433,19 @@ function _applyEvt(st,evt){
                 const eq=Number(d.equiv)||0, fee=Number(d.fee)||0;
                 const rot=d.rot&&Number(d.rot.w)>0?d.rot:null;
                 /* دالة خصم بالتجزئة من مخزون اسم معيّن — تُرجع المكافئ المخصوم فعلاً بعيار القطع */
-                const _deduct=(name,weight,karat)=>{
+                const _deduct=(name,weight,karat,lotId)=>{
                     let rem=Number(weight)||0,taken=0;
+                    /* 🎯 دفعة محدّدة عند البيع: اخصم منها أولاً (اختيار المستخدم) */
+                    if(lotId){
+                        const gi=st.goodsStock.findIndex(g=>g&&g.id===lotId&&g.n===name);
+                        if(gi>=0){
+                            const g=st.goodsStock[gi];
+                            const take=Math.min(g.w,rem);
+                            taken+=take*(Number(g.k)||705)/705;
+                            g.w=Math.round((g.w-take)*1000)/1000; rem=Math.round((rem-take)*1000)/1000;
+                            if(g.w<=0.0005)st.goodsStock.splice(gi,1);
+                        }
+                    }
                     for(let i=st.goodsStock.length-1;i>=0&&rem>0.0005;i--){
                         const g=st.goodsStock[i];
                         if(g.n!==name)continue;
@@ -517,7 +537,7 @@ function _applyEvt(st,evt){
                     _tagCust(d.c,'market'); /* بعت له → سوق */
                     /* 🚫 لا تُخصم سلعة من سلعة أخرى: الخصم من مخزون نفس الاسم فقط */
                     let takenEq=0;
-                    (d.items||[]).forEach(it=>{ takenEq+=_deduct(it.n,it.w,it.k); });
+                    (d.items||[]).forEach(it=>{ takenEq+=_deduct(it.n,it.w,it.k,it.lot); });
                     st.B.دولار-=Math.round(takenEq*1000)/1000;
                     stUpdDebt(d.c,'دولار',eq,d.empOwner||null);
                     if(fee)stUpdDebt(d.c,'دينار',fee,d.empOwner||null);

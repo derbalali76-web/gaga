@@ -462,6 +462,12 @@ window.VA = (() => {
             try{ _goodsProfitList(); }catch(e){}
             return true;
         }
+        /* 🧾 أجرة السلعة في المخزون: "أجرة السلعة" → مجموع أجرة السلع غير المباعة */
+        const _mentionsUjra=/(?:^|\s)(?:ال)?(?:اجر[هت]|اجور)/.test(_tn);
+        if(_mentionsUjra && _mentionsGoods){
+            try{ _goodsUjraStock(); }catch(e){}
+            return true;
+        }
         if(!_mentionsGoods && !_mentionsKassi && (/(فايده|حصيله|ربح|ارباح|مربوح)/.test(_tn)||/مد ?لي الفا/.test(t))){
             const isMonth=/(شهر|شهري)/.test(t.replace(/ة/g,'ه'))||/مد ?لي الفا/.test(t);
             try{ if(isMonth&&window.showMonthlyProfit)showMonthlyProfit(); else if(window.showPeriodSummary)showPeriodSummary('day'); respond(isMonth?'📈 فائدة الشهر':'📊 حصيلة اليوم'); }catch(e){}
@@ -814,6 +820,54 @@ window.VA = (() => {
         } catch (e) {}
     };
     window._goodsProfitReopen = _goodsProfitList;
+
+    /* ════════════ 🧾 أجرة السلعة في المخزون ════════════
+       مجموع أجرة الصياغة للسلع المتبقية (غير المباعة):
+       لكل سلعة: (وزن الشراء − وزن البيع) × متوسط أجرة الشراء لكل غرام */
+    function _goodsUjraStock() {
+        try {
+            const invs = _gl('dollInvoices');
+            const g = {}; /* name → {buyW, buyFee, sellW} */
+            invs.forEach(v => {
+                (v.items || []).forEach(it => {
+                    const name = it.n; if (!name) return;
+                    const w = Number(it.w) || 0; if (w <= 0) return;
+                    const fee = it.fv != null ? Number(it.fv) : (w * (Number(it.p) || 0));
+                    const o = g[name] || (g[name] = { buyW: 0, buyFee: 0, sellW: 0 });
+                    if (v.isBuy) { o.buyW += w; o.buyFee += fee; }
+                    else { o.sellW += w; }
+                });
+            });
+            const f0 = n => Math.round(n || 0).toLocaleString('fr-FR');
+            let total = 0, rows = '', count = 0;
+            Object.keys(g).forEach(name => {
+                const o = g[name];
+                const remW = o.buyW - o.sellW;
+                if (remW <= 0.001) return;
+                const avgFee = o.buyW > 0 ? o.buyFee / o.buyW : 0;
+                const ujra = remW * avgFee;
+                total += ujra; count++;
+                rows += `<div style="display:flex;justify-content:space-between;align-items:center;padding:.55rem .7rem;margin-bottom:.35rem;background:rgba(212,175,55,.06);border:1.5px solid rgba(212,175,55,.35);border-radius:10px">
+                    <span style="font-weight:800;font-size:.86rem">🛍️ ${name}<br><small style="font-weight:500;color:#999">${remW.toFixed(2)} غ في المخزون</small></span>
+                    <b style="color:#d4af37;white-space:nowrap">${f0(ujra)} دج</b></div>`;
+            });
+            if (!count) {
+                showCard(`<div class="va-card-title">🧾 أجرة السلعة في المخزون</div><div class="va-card-sub">لا توجد سلعة في المخزون حالياً</div><div style="text-align:center;margin-top:.6rem"><button class="va-card-btn va-card-btn-red" onclick="closeCard()">حسناً</button></div>`);
+                respond('ما عندك حتى سلعة في المخزون دابا');
+                return;
+            }
+            showCard(`
+                <div class="va-card-title" style="color:#d4af37">🧾 أجرة السلعة في المخزون</div>
+                <div class="va-card-sub">أجرة الصياغة للسلع غير المباعة</div>
+                <div style="max-height:48vh;overflow-y:auto;margin-top:.5rem">${rows}</div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:.7rem;margin-top:.5rem;background:rgba(212,175,55,.14);border:1.5px solid #d4af37;border-radius:12px">
+                    <span style="font-weight:900;font-size:.9rem">الإجمالي (${count} سلعة)</span>
+                    <b style="color:#d4af37;font-size:1.15rem">${f0(total)} دج</b></div>
+                <div style="text-align:center;margin-top:.6rem"><button class="va-card-btn va-card-btn-red" onclick="closeCard()">إغلاق</button></div>
+            `);
+            respond(`أجرة السلعة في المخزون ${f0(total)} دينار`);
+        } catch (e) {}
+    }
 
     /* ════════════ 💰 فائدة اللاكاص/السبائك من الفاتورة العادية ════════════
        السبائك التي أشتريها وأبيعها من فاتورة الشراء/البيع (الميزان/القوبال/705/السعر)
