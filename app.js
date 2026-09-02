@@ -1189,7 +1189,7 @@ window._publishPortal=()=>{
         /* رتّب الأحدث أولاً ثم خذ 500 (بدل قصّ عشوائي قد يفقد الأحدث) */
         _all.sort((a,b)=>(b._ts||0)-(a._ts||0));
         const myOps=_all.slice(0,500).map(o=>({
-            id:o.id||'',t:o.t||'',a:o.a||0,m:o.m||'',dt:o.dt||'',did:o.did||'',fee:o.fee||0,_ts:o._ts||0
+            id:o.id||'',t:o.t||'',a:o.a||0,m:o.m||'',dt:o.dt||'',did:o.did||'',fee:o.fee||0,note:o.note||'',_ts:o._ts||0
         }));
         const inv={};
         (dollInvoices||[]).filter(v=>_norm(v.c)===_key).slice(0,300).forEach(v=>{inv[v.id]=v;});
@@ -1399,6 +1399,8 @@ window._renderCustPortal=(d)=>{
         if(inv&&inv.kass&&inv.kass.eq)detail+=`<div style="font-size:.62rem;color:#2dd4bf">⚱️ ${inv.isBuy?'أخذت لاكاص':'دفعت لاكاص'}: ${fmt(inv.kass.eq,2)} غ (705)</div>`;
         if(inv&&inv.cashiCash)detail+=`<div style="font-size:.62rem;color:#fbbf24">💵 ${inv.isBuy?'أخذت':'دفعت'} كاصي: ${fmt(inv.cashiCash.amt,0)} دج</div>`;
         if(inv&&inv.cashiFee&&inv.cashiFee.din)detail+=`<div style="font-size:.62rem;color:#c4b5fd">⚱️ ${inv.isBuy?'أخذت':'دفعت'} أجرة بالكاصي: ${fmt(inv.cashiFee.din,0)} دج</div>`;
+        if(inv&&inv.liveKassi&&inv.liveKassi.w)detail+=`<div style="font-size:.62rem;color:#fb923c">🔥 كاصي حي (خام): ${fmt(inv.liveKassi.w,2)} غ (مؤقتاً 705)</div>`;
+        if(o.note)detail+=`<div style="font-size:.62rem;color:#cbd5e1;line-height:1.55;margin-top:.15rem">📝 ${o.note}</div>`;
         return `<div onclick="${clickable?`window._viewPortalInv('${o.did}')`:''}"
             style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:12px;padding:.6rem .75rem;margin-bottom:.45rem;${clickable?'cursor:pointer':''}">
             <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem">
@@ -1579,21 +1581,6 @@ window.applyGoodsCode=()=>{
     if(typeof _updGoodsTotal==='function')_updGoodsTotal();
     sel.value='';
     toast('✅ عُبّئت سلعة الكود «'+c.code+'» — راجع ثم احفظ');
-};
-/* 🔖 إنشاء كود مباشرة من مخزون السلعة (سلعة موجودة → كود + سعر اختياري يُقترح عند البيع) */
-window.addCodeFromStock=(name)=>{
-    if(!name)return;
-    const code=(prompt('🔖 رمز الكود للسلعة «'+name+'»:')||'').trim();
-    if(!code)return;
-    const priceStr=(prompt('💰 سعر الأجرة/غ (اختياري — اتركه فارغاً):')||'').trim();
-    const p=parseFloat(priceStr.replace(/\s/g,'').replace(',','.'))||0;
-    const dup=window._goodsCodes.findIndex(c=>c.code===code);
-    const rec={code,items:[{n:name,...(p>0?{p}:{})}]};
-    if(dup>=0){ if(!confirm('الكود «'+code+'» موجود — استبداله؟'))return; window._goodsCodes[dup]=rec; }
-    else window._goodsCodes.push(rec);
-    _persistGoodsCodes();
-    if(typeof renderGoodsCodesList==='function')renderGoodsCodesList();
-    toast('✅ كود «'+code+'» — يظهر كاقتراح عند البيع');
 };
 let _dollPaid=true; /* دائماً خالص في نظام السلعة */
 window.setDollPaid=(v)=>{ _dollPaid=true; }; /* مُحيَّدة — أزرار خالص/غير خالص أُزيلت */
@@ -2157,15 +2144,14 @@ window.renderGoodsStock=()=>{
                 <b style="color:var(--g600);white-space:nowrap">${fmt(l.w,2)} غ</b>
             </div>`).join('');
         return `
-        <div class="saved-card" style="cursor:pointer;display:flex;align-items:flex-start;gap:.5rem" onclick="var e=document.getElementById('${detailId}');if(e)e.style.display=(e.style.display==='none'?'block':'none')">
-            <div style="flex:1;min-width:0">
+        <div class="saved-card" style="cursor:pointer" onclick="var e=document.getElementById('${detailId}');if(e)e.style.display=(e.style.display==='none'?'block':'none')">
+            <div>
                 <strong>🛍️ ${G.n}</strong>
                 <span style="color:var(--g600);font-weight:900;margin-right:.3rem">⚖️ ${fmt(G.w,2)} غ</span>
                 ${G.k?`<span style="color:var(--pu);font-weight:800;margin-right:.3rem">🏷️ عيار ${fmt(G.k,0)}</span>`:''}
                 <small style="color:var(--t2);display:block;font-size:.62rem">${G.lots.length} دفعة${multi?' — اضغط للتفصيل 👆':' · '+(G.lots[0].src||'—')+' · أجرة '+fmt(G.lots[0].p||0,0)+' دج/غ'}</small>
                 <div id="${detailId}" style="display:none;margin-top:.4rem">${lotsHtml}</div>
             </div>
-            <button onclick="event.stopPropagation();addCodeFromStock('${(G.n||'').replace(/'/g,"\\'")}')" style="flex-shrink:0;border:none;border-radius:8px;background:rgba(212,175,55,.15);color:var(--g600);font-weight:900;font-size:.66rem;padding:.4rem .55rem;cursor:pointer;font-family:Tajawal,sans-serif">🔖 كود</button>
         </div>`;
     }).join('');
 };

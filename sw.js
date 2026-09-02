@@ -9,7 +9,7 @@ const NS = (() => { try {
   return (safe || 'root') + '#' + (h>>>0).toString(36);
 } catch(e){ return 'root'; } })();
 const CACHE_PREFIX = 'goldpro@' + NS + '-';
-const CACHE = CACHE_PREFIX + 'v185';
+const CACHE = CACHE_PREFIX + 'v187';
 
 /* ملفات التطبيق المحلية (تُخزَّن عند التثبيت) */
 const ASSETS = [
