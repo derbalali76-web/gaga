@@ -1240,7 +1240,57 @@ window._publishPortal=()=>{
             ops:myOps, inv
         };
         try{window._savePortalDataFb(ph,pin,window._shopId(),payload);}catch(e){}
+        /* 🔔 إشعار الزبون عند وجود عملية أحدث من آخر ما أُشعر به (يعمل فقط إن هُيّئ OneSignal) */
+        try{
+            const _newest=myOps.length?(myOps[0]._ts||0):0;
+            const _nk='gp12_osnotif_'+ph;
+            const _last=Number(localStorage.getItem(_nk)||0);
+            if(_last===0){ localStorage.setItem(_nk,String(_newest)); }        /* أول مرة: خط أساس بلا إشعار */
+            else if(_newest>_last){
+                localStorage.setItem(_nk,String(_newest));
+                if(window._osNotify)window._osNotify(ph,'🧾 فاتورة جديدة',name+' — سُجّلت لك عملية جديدة، افتح كشفك لمراجعتها');
+            }
+        }catch(e){}
     });
+};
+/* ═══════════ 🔔 إشعارات OneSignal للزبائن (مُعطّلة حتى ضبط المفاتيح في index.html) ═══════════ */
+/* 📲 تثبيت التطبيق كـ APK على أندرويد (PWA install prompt) */
+window.installApp=async()=>{
+    const d=window._deferredInstall;
+    if(d){
+        try{
+            d.prompt();
+            const {outcome}=await d.userChoice;
+            toast(outcome==='accepted'?'✅ يتم تثبيت التطبيق...':'أُلغي التثبيت', outcome==='accepted'?'success':'info');
+        }catch(e){}
+        window._deferredInstall=null;
+        return;
+    }
+    const ua=navigator.userAgent||'';
+    if(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches){
+        toast('التطبيق مثبّت بالفعل ✅','success');
+    }else if(/iphone|ipad|ipod/i.test(ua)){
+        toast('على آيفون: زر المشاركة ⬆️ ثم «إضافة إلى الشاشة الرئيسية»','info');
+    }else{
+        toast('افتح الموقع في Chrome ثم من قائمة ⋮ اختر «تثبيت التطبيق»','info');
+    }
+};
+window._osSubscribeCustomer=(phone)=>{
+    if(!window._OS_APPID||!phone||!window.OneSignalDeferred)return;
+    window.OneSignalDeferred.push(async function(OneSignal){
+        try{ await OneSignal.login(String(phone)); }catch(e){}              /* ربط الاشتراك برقم الهاتف */
+        try{ await OneSignal.Notifications.requestPermission(); }catch(e){}   /* طلب إذن الإشعارات */
+    });
+};
+/* الإرسال يتم عبر دالة Firebase Cloud: العميل يضع الطلب في طابور goldpro/notifs
+   والدالة تقرأه وترسل عبر OneSignal بمفتاح REST سرّي على الخادم (لا يُكشف أبداً). */
+window._osNotify=(phone,title,body)=>{
+    if(!window._OS_APPID||!phone)return;   /* App ID مضبوط = الميزة مفعّلة */
+    try{
+        firebase.database().ref('goldpro/notifs').push({
+            phone:String(phone), title:String(title||''), body:String(body||''), ts:Date.now()
+        });
+    }catch(e){}
 };
 window._publishPortalDebounced=(function(){let t=null;return function(){clearTimeout(t);t=setTimeout(()=>{try{window._publishPortal();}catch(e){}},2500);};})();
 
@@ -1288,6 +1338,8 @@ window._tryCustomerPortal=async(phoneDigits,pin)=>{
     const ph=window._normPhone(phoneDigits);
     const cleanPin=(pin||'').trim().replace(/[\/\.\#\$\[\]\s]/g,'');
     if(!ph||ph.length<8||!cleanPin)return false;
+    /* 🔔 اربط اشتراك الإشعارات برقم الزبون (يعمل فقط إن هُيّئ OneSignal) */
+    if(window._osSubscribeCustomer)try{window._osSubscribeCustomer(ph);}catch(e){}
     /* 📱 كاش محلي: اعرض آخر كشف محفوظ فوراً (بلا انتظار الشبكة) */
     const _ckey='gp12_portal_'+ph+'_'+cleanPin;
     let _cached=null;

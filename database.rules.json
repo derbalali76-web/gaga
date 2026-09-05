@@ -16,6 +16,12 @@
         ".read": "auth != null",
         ".write": "auth != null"
       },
+      "notifs": {
+        ".read": false,
+        "$id": {
+          ".write": "auth != null"
+        }
+      },
       "$user": {
         "data": {
           ".read": "auth != null",
