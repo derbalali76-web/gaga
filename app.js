@@ -1254,27 +1254,6 @@ window._publishPortal=()=>{
     });
 };
 /* ═══════════ 🔔 إشعارات OneSignal للزبائن (مُعطّلة حتى ضبط المفاتيح في index.html) ═══════════ */
-/* 📲 تثبيت التطبيق كـ APK على أندرويد (PWA install prompt) */
-window.installApp=async()=>{
-    const d=window._deferredInstall;
-    if(d){
-        try{
-            d.prompt();
-            const {outcome}=await d.userChoice;
-            toast(outcome==='accepted'?'✅ يتم تثبيت التطبيق...':'أُلغي التثبيت', outcome==='accepted'?'success':'info');
-        }catch(e){}
-        window._deferredInstall=null;
-        return;
-    }
-    const ua=navigator.userAgent||'';
-    if(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches){
-        toast('التطبيق مثبّت بالفعل ✅','success');
-    }else if(/iphone|ipad|ipod/i.test(ua)){
-        toast('على آيفون: زر المشاركة ⬆️ ثم «إضافة إلى الشاشة الرئيسية»','info');
-    }else{
-        toast('افتح الموقع في Chrome ثم من قائمة ⋮ اختر «تثبيت التطبيق»','info');
-    }
-};
 window._osSubscribeCustomer=(phone)=>{
     if(!window._OS_APPID||!phone||!window.OneSignalDeferred)return;
     window.OneSignalDeferred.push(async function(OneSignal){
